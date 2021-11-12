@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
 module Main (main) where
 
 import Control.Concurrent
@@ -43,14 +46,14 @@ data Action
 main :: IO ()
 main = do
     Opts{..} <- getRecord "Clark"
-    mvar <- newEmptyMVar
+    let light = deviceFromAddress (192, 168, 1, 190)
 
     let listenOnNetwork = forever do
             sock <- socket AF_INET Datagram defaultProtocol
             bind sock $ SockAddrInet (fromIntegral optReceivePort) 0
             bs <- recv sock 1
             withSGR' Blue $ BS.putStrLn $ "Received UDP message: " <> bs
-            putMVar mvar ToggleLight
+            runLifx $ toggleLight light
 
     let listenForButton = do
             putStrLn "Starting gpiomon process..."
@@ -69,20 +72,11 @@ main = do
                         then withSGR' Red $ putStr "Ignoring: "
                         else do
                             withSGR' Green $ putStr "Ok: "
-                            putMVar mvar ToggleLight
+                            runLifx $ toggleLight light
                     putStrLn line
                     pure t1
 
-    listenOnNetwork `concurrently_` listenForButton `concurrently_` runLifxUntilSuccess (lifxTime optLifxTimeout) do
-        devs <- discoverDevices Nothing
-        devStates <- traverse (\d -> (d,) <$> sendMessage d GetColor) devs
-        case find ((== encodeUtf8 optLightName) . label . snd) devStates of
-            Nothing -> do
-                liftIO $ putStrLn "Couldn't find ceiling light, only:"
-                pPrintOpt CheckColorTty defaultOutputOptionsDarkBg{outputOptionsInitialIndent = 4} devStates
-            Just (light, _) -> forever do
-                liftIO (takeMVar mvar) >>= \case
-                    ToggleLight -> toggleLight light
+    listenOnNetwork `concurrently_` listenForButton
 
 toggleLight :: MonadLifx m => Device -> m ()
 toggleLight light = sendMessage light . SetPower . not . statePowerToBool =<< sendMessage light GetPower
