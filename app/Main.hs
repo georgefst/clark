@@ -51,10 +51,10 @@ main = do
     let listenOnNetwork = do
             sock <- socket AF_INET Datagram defaultProtocol
             bind sock $ SockAddrInet (fromIntegral optReceivePort) 0
-            forever do
-                bs <- recv sock 1
-                withSGR' Blue $ BS.putStrLn $ "Received UDP message: " <> bs
-                runLifx $ toggleLight light
+            forever $ runLifxUntilSuccess (lifxTime optLifxTimeout) do
+                bs <- liftIO $ recv sock 1
+                liftIO $ withSGR' Blue $ BS.putStrLn $ "Received UDP message: " <> bs
+                toggleLight light
 
     let listenForButton = do
             putStrLn "Starting gpiomon process..."
@@ -65,16 +65,16 @@ main = do
                         }
             putStrLn "Done!"
 
-            handle (\(e :: IOException) -> print e >> cleanupProcess hs) $
-                getCurrentTime >>= iterateM_ \t0 -> do
-                    line <- hGetLine gpiomonStdout
-                    t1 <- getCurrentTime
+            handle (\(e :: IOException) -> print e >> cleanupProcess hs) . runLifxUntilSuccess (lifxTime optLifxTimeout) $
+                liftIO getCurrentTime >>= iterateM_ \t0 -> do
+                    line <- liftIO $ hGetLine gpiomonStdout
+                    t1 <- liftIO getCurrentTime
                     if diffUTCTime t1 t0 < realToFrac optButtonDebounce
-                        then withSGR' Red $ putStr "Ignoring: "
+                        then liftIO $ withSGR' Red $ putStr "Ignoring: "
                         else do
-                            withSGR' Green $ putStr "Ok: "
-                            runLifx $ toggleLight light
-                    putStrLn line
+                            liftIO $ withSGR' Green $ putStr "Ok: "
+                            toggleLight light
+                    liftIO $ putStrLn line
                     pure t1
 
     listenOnNetwork `concurrently_` listenForButton
