@@ -1,15 +1,22 @@
-module Main (main) where
-
 import Control.Concurrent
-import Control.Monad.IO.Class
-import Lifx.Lan
+import Control.Monad
+import Control.Monad.Except
+import Control.Monad.State
+
+import Lib
 
 main :: IO ()
 main = do
     m <- newEmptyMVar
     let x =
-            runLifxT 0 $
+            runLifxT $
                 liftIO (takeMVar m) >>= \() ->
-                    sendMessage (deviceFromAddress (192, 168, 1, 190)) =<< pure (SetPower True)
+                    sendMessage =<< pure ()
         go () = either (\_ -> go ()) pure =<< x
     go ()
+
+sendMessage :: MonadIO f => () -> f ()
+sendMessage () = void . liftIO $ undefined
+
+runLifxT :: Monad m => LifxT m a -> m (Either Error a)
+runLifxT x = runExceptT $ evalStateT (unLifxT x) ()
