@@ -8,8 +8,8 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Trans.Maybe
 
-newtype LifxT m a = LifxT
-    { unLifxT ::
+newtype Trans m a = Trans
+    { unTrans ::
         StateT
             ()
             ( MaybeT

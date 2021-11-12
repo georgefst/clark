@@ -12,10 +12,10 @@ main = go ()
   where
     go () =
         maybe (go ()) pure
-            =<< runLifxT
+            =<< runM
                 ( (\() -> void $ liftIO $ pure ())
                     =<< liftIO (pure ())
                 )
 
-runLifxT :: LifxT IO a -> IO (Maybe a)
-runLifxT x = runMaybeT $ evalStateT (unLifxT x) ()
+runM :: Trans IO a -> IO (Maybe a)
+runM x = runMaybeT $ evalStateT (unTrans x) ()
