@@ -18,4 +18,4 @@ main = go ()
                 )
 
 runM :: Trans IO a -> IO (Maybe a)
-runM x = runMaybeT $ evalStateT (unTrans x) ()
+runM (Trans x) = runMaybeT $ evalStateT x ()
