@@ -48,12 +48,13 @@ main = do
     Opts{..} <- getRecord "Clark"
     let light = deviceFromAddress (192, 168, 1, 190)
 
-    let listenOnNetwork = forever do
+    let listenOnNetwork = do
             sock <- socket AF_INET Datagram defaultProtocol
             bind sock $ SockAddrInet (fromIntegral optReceivePort) 0
-            bs <- recv sock 1
-            withSGR' Blue $ BS.putStrLn $ "Received UDP message: " <> bs
-            runLifx $ toggleLight light
+            forever do
+                bs <- recv sock 1
+                withSGR' Blue $ BS.putStrLn $ "Received UDP message: " <> bs
+                runLifx $ toggleLight light
 
     let listenForButton = do
             putStrLn "Starting gpiomon process..."
