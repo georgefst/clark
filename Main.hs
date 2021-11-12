@@ -1,22 +1,21 @@
-import Control.Concurrent
+{-# OPTIONS_GHC -Wall #-}
+
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.State
+import Control.Monad.Trans.Maybe
 
 import Lib
 
 main :: IO ()
-main = do
-    m <- newEmptyMVar
-    let x =
-            runLifxT $
-                liftIO (takeMVar m) >>= \() ->
-                    sendMessage =<< pure ()
-        go () = either (\_ -> go ()) pure =<< x
-    go ()
+main = go ()
+  where
+    go () =
+        maybe (go ()) pure
+            =<< runLifxT
+                ( (\() -> void $ liftIO $ pure ())
+                    =<< liftIO (pure ())
+                )
 
-sendMessage :: MonadIO f => () -> f ()
-sendMessage () = void . liftIO $ undefined
-
-runLifxT :: Monad m => LifxT m a -> m (Either Error a)
-runLifxT x = runExceptT $ evalStateT (unLifxT x) ()
+runLifxT :: LifxT IO a -> IO (Maybe a)
+runLifxT x = runMaybeT $ evalStateT (unLifxT x) ()

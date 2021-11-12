@@ -1,17 +1,18 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# OPTIONS_GHC -Wall #-}
 
 module Lib where
 
 import Control.Monad.Except
 import Control.Monad.State
+import Control.Monad.Trans.Maybe
 
 newtype LifxT m a = LifxT
     { unLifxT ::
         StateT
             ()
-            ( ExceptT
-                Error
+            ( MaybeT
                 m
             )
             a
@@ -22,6 +23,3 @@ newtype LifxT m a = LifxT
         , Monad
         , MonadIO
         )
-
-data Error
-    = Error
