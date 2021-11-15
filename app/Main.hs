@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedRecordDot #-}
 module Main (main) where
 
 import Control.Concurrent
@@ -21,20 +22,19 @@ import System.IO
 import System.Process.Extra
 import Text.Pretty.Simple (pPrint)
 
---TODO rename fields when we have OverloadedRecordDot (GHC 9.2), and thus simplify the `ParseRecord` instance
 data Opts = Opts
-    { optButtonDebounce :: Double
-    , optButtonPin :: Int
-    , optLightName :: Text
-    , optLifxTimeout :: Double
-    , optReceivePort :: Word16
+    { buttonDebounce :: Double
+    , buttonPin :: Int
+    , lightName :: Text
+    , lifxTimeout :: Double
+    , receivePort :: Word16
     }
     deriving (Show, Generic)
 instance ParseRecord Opts where
     parseRecord =
         parseRecordWithModifiers
             defaultModifiers
-                { fieldNameModifier = fieldNameModifier lispCaseModifiers . drop (length @[] "opt")
+                { fieldNameModifier = fieldNameModifier lispCaseModifiers
                 }
 
 data Action
@@ -43,14 +43,14 @@ data Action
 
 main :: IO ()
 main = do
-    Opts{..} <- getRecord "Clark"
+    (opts :: Opts) <- getRecord "Clark"
     mvar <- newEmptyMVar
     --TODO avoid hardcoding - discovery doesn't currently work on Clark (known GHC 9.2.1 code aarch64 code gen bug?)
     let light = deviceFromAddress (192, 168, 1, 190)
 
     let listenOnNetwork = do
             sock <- socket AF_INET Datagram defaultProtocol
-            bind sock $ SockAddrInet (fromIntegral optReceivePort) 0
+            bind sock $ SockAddrInet (fromIntegral opts.receivePort) 0
             forever do
                 bs <- recv sock 1
                 withSGR' Blue $ BSC.putStrLn $ "Received UDP message: " <> bs
@@ -62,7 +62,7 @@ main = do
             putStrLn "Starting gpiomon process..."
             hs@(_, Just gpiomonStdout, _, _) <-
                 createProcess
-                    (proc "gpiomon" ["-b", "-f", "gpiochip0", show optButtonPin])
+                    (proc "gpiomon" ["-b", "-f", "gpiochip0", show opts.buttonPin])
                         { std_out = CreatePipe
                         }
             putStrLn "Done!"
@@ -71,7 +71,7 @@ main = do
                 getCurrentTime >>= iterateM_ \t0 -> do
                     line <- hGetLine gpiomonStdout
                     t1 <- getCurrentTime
-                    if diffUTCTime t1 t0 < realToFrac optButtonDebounce
+                    if diffUTCTime t1 t0 < realToFrac opts.buttonDebounce
                         then withSGR' Red $ putStr "Ignoring: "
                         else do
                             withSGR' Green $ putStr "Ok: "
@@ -84,7 +84,7 @@ main = do
             --TODO we should shift `runLifx` a level up to avoid recreating the context, but we hit a GHC bug:
             -- https://gitlab.haskell.org/ghc/ghc/-/issues/20673
             takeMVar mvar >>= \case
-                ToggleLight -> runLifxUntilSuccess (lifxTime optLifxTimeout) $ toggleLight light
+                ToggleLight -> runLifxUntilSuccess (lifxTime opts.lifxTimeout) $ toggleLight light
 
 decodeAction :: ByteString -> Maybe Action
 decodeAction bs = case BS.unpack bs of
